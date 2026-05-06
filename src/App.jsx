@@ -134,7 +134,7 @@ export default function App(){
         </div>
       </header>
 
-      <main className="wrap" style={{padding:'32px 0 80px'}}>
+      <main className="wrap" style={{padding:'20px 0 48px'}}>
         {tab==='calc'&&<CalcView inputs={inputs} upd={upd} calc={calc} onSave={()=>setShowSave(true)}/>}
         {tab==='suburb'&&<SuburbView initialSuburb={inputs.suburb}/>}
         {tab==='compare'&&<CompareView saved={saved} remove={id=>setSaved(p=>p.filter(s=>s.id!==id))} cur={{inputs,calc}}/>}
@@ -145,10 +145,10 @@ export default function App(){
       {showSave&&(
         <div className="overlay" onClick={()=>setShowSave(false)}>
           <div className="dialog" onClick={e=>e.stopPropagation()}>
-            <h3 style={{fontFamily:'var(--ff)',fontSize:22,marginBottom:8}}>Save scenario</h3>
+            <h3 style={{fontFamily:'var(--ff)',fontSize:22,marginBottom:5}}>Save scenario</h3>
             <p style={{fontSize:12,color:'var(--muted)',marginBottom:16}}>Name this scenario to compare it with others.</p>
             <input autoFocus value={saveName} onChange={e=>setSaveName(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&saveName.trim()){setSaved(p=>[...p,{id:Date.now(),name:saveName.trim(),inputs:{...inputs},calc:{...calc}}]);setSaveName('');setShowSave(false);}}} placeholder="e.g. Lidcombe 2BR Unit" className="inp"/>
-            <div style={{display:'flex',gap:8,justifyContent:'flex-end',marginTop:16}}>
+            <div style={{display:'flex',gap:8,justifyContent:'flex-end',marginTop:10}}>
               <button className="btn-ghost" onClick={()=>setShowSave(false)}>Cancel</button>
               <button className="btn-accent" onClick={()=>{if(!saveName.trim())return;setSaved(p=>[...p,{id:Date.now(),name:saveName.trim(),inputs:{...inputs},calc:{...calc}}]);setSaveName('');setShowSave(false);}}>Save</button>
             </div>
@@ -314,16 +314,16 @@ function CalcView({inputs,upd,calc,onSave}){
           <ProjChart proj={calc.projection} pp={inputs.purchasePrice}/>
           <table className="tbl" style={{marginTop:12}}>
             <thead><tr style={{color:'var(--muted)',fontSize:11}}>
-              {['Yr','Value','Rent/yr','Cashflow','Equity'].map(h=><th key={h} style={{padding:'6px 4px',fontWeight:400,textAlign:h==='Yr'?'left':'right',textTransform:'uppercase',letterSpacing:'.06em'}}>{h}</th>)}
+              {['Yr','Value','Rent/yr','Cashflow','Equity'].map(h=><th key={h} style={{padding:'4px 4px',fontWeight:400,textAlign:h==='Yr'?'left':'right',textTransform:'uppercase',letterSpacing:'.06em'}}>{h}</th>)}
             </tr></thead>
             <tbody>
               {calc.projection.map(r=>(
                 <tr key={r.year} style={{borderTop:'1px solid var(--border)'}}>
-                  <td className="mono" style={{padding:'7px 4px',fontSize:12}}>{r.year}</td>
-                  <td className="mono" style={{padding:'7px 4px',fontSize:12,textAlign:'right'}}>{fmt(r.propValue)}</td>
-                  <td className="mono" style={{padding:'7px 4px',fontSize:12,textAlign:'right'}}>{fmt(r.rent)}</td>
-                  <td className="mono" style={{padding:'7px 4px',fontSize:12,textAlign:'right',color:r.cashflow>=0?'var(--pos)':'var(--neg)'}}>{fmt(r.cashflow)}</td>
-                  <td className="mono" style={{padding:'7px 4px',fontSize:12,textAlign:'right'}}>{fmt(r.equity)}</td>
+                  <td className="mono" style={{padding:'5px 4px',fontSize:12}}>{r.year}</td>
+                  <td className="mono" style={{padding:'5px 4px',fontSize:12,textAlign:'right'}}>{fmt(r.propValue)}</td>
+                  <td className="mono" style={{padding:'5px 4px',fontSize:12,textAlign:'right'}}>{fmt(r.rent)}</td>
+                  <td className="mono" style={{padding:'5px 4px',fontSize:12,textAlign:'right',color:r.cashflow>=0?'var(--pos)':'var(--neg)'}}>{fmt(r.cashflow)}</td>
+                  <td className="mono" style={{padding:'5px 4px',fontSize:12,textAlign:'right'}}>{fmt(r.equity)}</td>
                 </tr>
               ))}
             </tbody>
@@ -399,8 +399,8 @@ function SuburbView({initialSuburb}){
         </Card>
       </div>
       <div className="col-outputs">
-        {!data&&!loading&&!error&&<div className="empty"><MapPin size={32} style={{color:'var(--muted)',marginBottom:12}}/><h3 style={{fontFamily:'var(--ff)',fontSize:20,marginBottom:8}}>Suburb intelligence</h3><p style={{fontSize:13,color:'var(--muted)',maxWidth:340}}>Enter a suburb for median prices, rental yields, vacancy, growth, and a live buy/watch/avoid verdict.</p></div>}
-        {loading&&<div className="empty"><Loader2 size={28} style={{color:'var(--acc)',marginBottom:12,animation:'spin .8s linear infinite'}}/><p style={{color:'var(--muted)',fontSize:13}}>Searching property data…</p></div>}
+        {!data&&!loading&&!error&&<div className="empty"><MapPin size={32} style={{color:'var(--muted)',marginBottom:6}}/><h3 style={{fontFamily:'var(--ff)',fontSize:20,marginBottom:5}}>Suburb intelligence</h3><p style={{fontSize:13,color:'var(--muted)',maxWidth:340}}>Enter a suburb for median prices, rental yields, vacancy, growth, and a live buy/watch/avoid verdict.</p></div>}
+        {loading&&<div className="empty"><Loader2 size={28} style={{color:'var(--acc)',marginBottom:6,animation:'spin .8s linear infinite'}}/><p style={{color:'var(--muted)',fontSize:13}}>Searching property data…</p></div>}
         {error&&<div style={{display:'flex',gap:12,padding:16,borderRadius:8,border:'1px solid var(--neg)',background:'rgba(194,80,80,.06)'}}><AlertCircle size={16} style={{color:'var(--neg)',marginTop:2}}/><span style={{fontSize:13}}>{error}</span></div>}
         {data&&<div style={{display:'flex',flexDirection:'column',gap:14}}>
           <div>
@@ -408,29 +408,29 @@ function SuburbView({initialSuburb}){
               <h2 style={{fontFamily:'var(--ff)',fontSize:26,fontWeight:500}}>{suburb}</h2>
               <span style={{padding:'3px 10px',borderRadius:4,fontSize:10,letterSpacing:'.1em',textTransform:'uppercase',background:vc,color:'var(--bg)',fontWeight:700}}>{data.verdict}</span>
             </div>
-            <p style={{fontSize:12,fontStyle:'italic',color:'var(--muted)',marginBottom:8}}>"{data.verdictReason}"</p>
+            <p style={{fontSize:12,fontStyle:'italic',color:'var(--muted)',marginBottom:5}}>"{data.verdictReason}"</p>
             <p style={{fontSize:13,lineHeight:1.6}}>{data.summary}</p>
           </div>
           <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8}}>
             {[['Median price',data.metrics.medianPrice?fmt(data.metrics.medianPrice):'n/a'],['Weekly rent',data.metrics.medianWeeklyRent?fmt(data.metrics.medianWeeklyRent):'n/a'],['Gross yield',data.metrics.grossYield?pct(data.metrics.grossYield):'n/a'],['Vacancy',data.metrics.vacancyRate?pct(data.metrics.vacancyRate,1):'n/a'],['5yr growth',data.metrics.fiveYearGrowth?pct(data.metrics.fiveYearGrowth,1):'n/a'],['Rent growth',data.metrics.rentGrowthYoY?pct(data.metrics.rentGrowthYoY,1):'n/a']].map(([l,v])=>(
-              <div key={l} style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:6,padding:'10px 12px'}}>
+              <div key={l} style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:6,padding:'7px 10px'}}>
                 <div style={{fontSize:10,letterSpacing:'.07em',textTransform:'uppercase',color:'var(--muted)',marginBottom:4}}>{l}</div>
                 <div className="mono" style={{fontSize:15}}>{v}</div>
               </div>
             ))}
           </div>
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
-            <div style={{background:'var(--surface)',border:'1px solid var(--border)',borderLeft:'3px solid var(--pos)',borderRadius:6,padding:14}}>
+            <div style={{background:'var(--surface)',border:'1px solid var(--border)',borderLeft:'3px solid var(--pos)',borderRadius:6,padding:10}}>
               <div style={{fontSize:10,letterSpacing:'.07em',textTransform:'uppercase',color:'var(--pos)',marginBottom:8,display:'flex',alignItems:'center',gap:4}}><TrendingUp size={10}/>Strengths</div>
               {data.strengths.map((s,i)=><div key={i} style={{fontSize:12,lineHeight:1.5,display:'flex',gap:6,marginBottom:4}}><span style={{color:'var(--pos)'}}>+</span>{s}</div>)}
             </div>
-            <div style={{background:'var(--surface)',border:'1px solid var(--border)',borderLeft:'3px solid var(--neg)',borderRadius:6,padding:14}}>
+            <div style={{background:'var(--surface)',border:'1px solid var(--border)',borderLeft:'3px solid var(--neg)',borderRadius:6,padding:10}}>
               <div style={{fontSize:10,letterSpacing:'.07em',textTransform:'uppercase',color:'var(--neg)',marginBottom:8,display:'flex',alignItems:'center',gap:4}}><TrendingDown size={10}/>Risks</div>
               {data.risks.map((s,i)=><div key={i} style={{fontSize:12,lineHeight:1.5,display:'flex',gap:6,marginBottom:4}}><span style={{color:'var(--neg)'}}>−</span>{s}</div>)}
             </div>
           </div>
-          {data.comparableSuburbs?.length>0&&<div style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:6,padding:14}}>
-            <div style={{fontSize:10,letterSpacing:'.07em',textTransform:'uppercase',color:'var(--muted)',marginBottom:10}}>Comparable / alternative suburbs</div>
+          {data.comparableSuburbs?.length>0&&<div style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:6,padding:10}}>
+            <div style={{fontSize:10,letterSpacing:'.07em',textTransform:'uppercase',color:'var(--muted)',marginBottom:6}}>Comparable / alternative suburbs</div>
             {data.comparableSuburbs.map((c,i)=><div key={i} style={{display:'flex',gap:10,marginBottom:8,fontSize:12}}><span style={{fontFamily:'var(--ff)',fontSize:14,color:'var(--acc)',minWidth:110}}>{c.name}</span><span style={{color:'var(--muted)',lineHeight:1.5}}>{c.reason}</span></div>)}
           </div>}
         </div>}
@@ -441,7 +441,7 @@ function SuburbView({initialSuburb}){
 
 function CompareView({saved,remove,cur}){
   const all=[{id:'current',name:'Current',inputs:cur.inputs,calc:cur.calc,isCur:true},...saved];
-  if(!saved.length)return<div className="empty" style={{minHeight:300}}><Layers size={32} style={{color:'var(--muted)',marginBottom:12}}/><h3 style={{fontFamily:'var(--ff)',fontSize:20,marginBottom:8}}>No saved scenarios</h3><p style={{fontSize:13,color:'var(--muted)',maxWidth:340}}>Save scenarios from the Calculator tab to compare them side-by-side.</p></div>;
+  if(!saved.length)return<div className="empty" style={{minHeight:300}}><Layers size={32} style={{color:'var(--muted)',marginBottom:6}}/><h3 style={{fontFamily:'var(--ff)',fontSize:20,marginBottom:5}}>No saved scenarios</h3><p style={{fontSize:13,color:'var(--muted)',maxWidth:340}}>Save scenarios from the Calculator tab to compare them side-by-side.</p></div>;
   const mets=[{k:'grossYield',l:'Gross yield',f:v=>pct(v),hi:true},{k:'netYield',l:'Net yield',f:v=>pct(v),hi:true},{k:'cashflowAfterTaxWeekly',l:'Weekly cashflow',f:v=>fmt(v),hi:true},{k:'cashOnCash',l:'Cash-on-cash',f:v=>pct(v),hi:true},{k:'totalCashRequired',l:'Cash to close',f:v=>fmt(v),hi:false},{k:'lvr',l:'LVR',f:v=>pct(v,1),hi:false}];
   const best=(k,hi)=>{let bi=0,bv=all[0].calc[k];for(let i=1;i<all.length;i++){if(hi?all[i].calc[k]>bv:all[i].calc[k]<bv){bi=i;bv=all[i].calc[k];}}return bi;};
   return(
@@ -457,13 +457,13 @@ function CompareView({saved,remove,cur}){
         </tr></thead>
         <tbody>
           {mets.map(m=>{const bi=best(m.k,m.hi);return(<tr key={m.k} style={{borderTop:'1px solid var(--border)'}}>
-            <td style={{padding:'10px 12px',fontSize:11,color:'var(--muted)',letterSpacing:'.05em',textTransform:'uppercase'}}>{m.l}</td>
-            {all.map((s,i)=><td key={s.id} className="mono" style={{padding:'10px 12px',color:i===bi?'var(--pos)':'var(--text)'}}>{m.f(s.calc[m.k])}{i===bi&&<span style={{fontSize:10,marginLeft:4}}>★</span>}</td>)}
+            <td style={{padding:'7px 10px',fontSize:11,color:'var(--muted)',letterSpacing:'.05em',textTransform:'uppercase'}}>{m.l}</td>
+            {all.map((s,i)=><td key={s.id} className="mono" style={{padding:'7px 10px',color:i===bi?'var(--pos)':'var(--text)'}}>{m.f(s.calc[m.k])}{i===bi&&<span style={{fontSize:10,marginLeft:4}}>★</span>}</td>)}
           </tr>);})}
           {[{l:'Value Yr 10',f:s=>fmt(s.calc.projection[9].propValue)},{l:'Equity Yr 10',f:s=>fmt(s.calc.projection[9].equity)},{l:'Break-even',f:s=>s.calc.breakEvenYear?`Year ${s.calc.breakEvenYear}`:'> 10 yrs'}].map(r=>(
             <tr key={r.l} style={{borderTop:'1px solid var(--border)'}}>
-              <td style={{padding:'10px 12px',fontSize:11,color:'var(--muted)',letterSpacing:'.05em',textTransform:'uppercase'}}>{r.l}</td>
-              {all.map(s=><td key={s.id} className="mono" style={{padding:'10px 12px'}}>{r.f(s)}</td>)}
+              <td style={{padding:'7px 10px',fontSize:11,color:'var(--muted)',letterSpacing:'.05em',textTransform:'uppercase'}}>{r.l}</td>
+              {all.map(s=><td key={s.id} className="mono" style={{padding:'7px 10px'}}>{r.f(s)}</td>)}
             </tr>
           ))}
         </tbody>
@@ -473,7 +473,7 @@ function CompareView({saved,remove,cur}){
 }
 
 // ── Primitives ──────────────────────────────────────────────
-function Card({title,n,children}){return<div className="card"><div className="card-hdr"><h2 className="card-ttl">{title}</h2><span style={{fontFamily:'monospace',fontSize:10,color:'var(--muted)'}}>—{n}</span></div><div style={{display:'flex',flexDirection:'column',gap:12}}>{children}</div></div>;}
+function Card({title,n,children}){return<div className="card"><div className="card-hdr"><h2 className="card-ttl">{title}</h2><span style={{fontFamily:'monospace',fontSize:10,color:'var(--muted)'}}>—{n}</span></div><div style={{display:'flex',flexDirection:'column',gap:8}}>{children}</div></div>;}
 function F({l,pre,suf,children}){return<div><div className="flbl">{l}</div><div style={{display:'flex',alignItems:'center',gap:6}}>{pre&&<span style={{fontSize:12,color:'var(--muted)'}}>{pre}</span>}<div style={{flex:1}}>{children}</div>{suf&&<span style={{fontSize:12,color:'var(--muted)',whiteSpace:'nowrap'}}>{suf}</span>}</div></div>;}
 function Grid2({children}){return<div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>{children}</div>;}
 function Num({value,onChange,step=1}){return<input type="number" value={value} step={step} onChange={e=>onChange(e.target.value===''?0:Number(e.target.value))} className="inp mono"/>;}
@@ -481,7 +481,7 @@ function Sel({value,onChange,opts}){return<select value={value} onChange={e=>onC
 function Tog({opts,val,set}){return<div style={{display:'flex',gap:1,background:'var(--bg)',border:'1px solid var(--border)',borderRadius:5,padding:2}}>{opts.map(([v,l])=><button key={String(v)} onClick={()=>set(v)} style={{flex:1,padding:'6px 8px',fontSize:11,borderRadius:4,border:'none',cursor:'pointer',background:String(val)===String(v)?'var(--acc)':'transparent',color:String(val)===String(v)?'var(--bg)':'var(--muted)',transition:'all .15s',fontFamily:'var(--font)',whiteSpace:'nowrap'}}>{l}</button>)}</div>;}
 function Stat({l,v,s,tone}){const c={pos:'var(--pos)',neg:'var(--neg)',neu:'var(--text)'}[tone];return<div className="stat"><div className="stat-l">{l}</div><div className="stat-v mono" style={{color:c}}>{v}</div><div className="stat-s">{s}</div></div>;}
 function Acc({title,open:defOpen,children}){const[o,setO]=useState(!!defOpen);return<div className="acc"><button className="acc-hdr" onClick={()=>setO(x=>!x)}><span className="acc-ttl">{title}</span>{o?<ChevronDown size={14} style={{color:'var(--muted)'}}/>:<ChevronRight size={14} style={{color:'var(--muted)'}}/>}</button>{o&&<div style={{padding:'4px 16px 16px'}}>{children}</div>}</div>;}
-function TR({l,v,sub,bold,accent,pos,muted}){const c=accent?'var(--acc)':pos?'var(--pos)':muted?'var(--muted)':'var(--text)';return<tr style={{borderTop:'1px solid var(--border)'}}><td style={{padding:'8px 4px',fontWeight:bold?600:400,color:pos?'var(--pos)':muted?'var(--muted)':'var(--text)'}}>{l}{sub&&<div style={{fontSize:10,color:'var(--muted)',marginTop:2}}>{sub}</div>}</td><td className="mono" style={{padding:'8px 4px',textAlign:'right',color:c,fontWeight:bold?600:400,whiteSpace:'nowrap'}}>{v}</td></tr>;}
+function TR({l,v,sub,bold,accent,pos,muted}){const c=accent?'var(--acc)':pos?'var(--pos)':muted?'var(--muted)':'var(--text)';return<tr style={{borderTop:'1px solid var(--border)'}}><td style={{padding:'5px 4px',fontWeight:bold?600:400,color:pos?'var(--pos)':muted?'var(--muted)':'var(--text)'}}>{l}{sub&&<div style={{fontSize:10,color:'var(--muted)',marginTop:2}}>{sub}</div>}</td><td className="mono" style={{padding:'5px 4px',textAlign:'right',color:c,fontWeight:bold?600:400,whiteSpace:'nowrap'}}>{v}</td></tr>;}
 
 const CSS=`
 @import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;1,9..144,500&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
@@ -506,61 +506,61 @@ button{font-family:var(--font);cursor:pointer;}
 
 /* Header */
 .hdr{border-bottom:1px solid var(--border);background:rgba(13,12,10,.92);position:sticky;top:0;z-index:100;backdrop-filter:blur(12px);}
-.hdr-top{padding:24px 0 18px;}
-.eyebrow{font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--acc);margin-bottom:10px;display:flex;align-items:center;gap:8px;}
+.hdr-top{padding:14px 0 10px;}
+.eyebrow{font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--acc);margin-bottom:6px;display:flex;align-items:center;gap:8px;}
 .eyebrow::before,.eyebrow::after{content:'';display:inline-block;width:18px;height:1px;background:var(--acc);}
-.hero{font-family:var(--ff);font-size:clamp(28px,4vw,44px);line-height:1;letter-spacing:-.025em;font-weight:500;margin-bottom:10px;}
+.hero{font-family:var(--ff);font-size:clamp(22px,3vw,32px);line-height:1;letter-spacing:-.025em;font-weight:500;margin-bottom:6px;}
 .hero em{font-style:italic;color:var(--acc);}
 .hero-sub{font-size:12px;color:var(--muted);line-height:1.6;}
 .tabs{display:flex;gap:2px;border-top:1px solid var(--border2);margin-top:2px;}
-.tab{display:flex;align-items:center;gap:7px;padding:11px 16px;font-size:12px;border:none;border-bottom:2px solid transparent;background:none;color:var(--muted);cursor:pointer;transition:all .15s;letter-spacing:.02em;}
+.tab{display:flex;align-items:center;gap:6px;padding:8px 14px;font-size:12px;border:none;border-bottom:2px solid transparent;background:none;color:var(--muted);cursor:pointer;transition:all .15s;letter-spacing:.02em;}
 .tab:hover{color:var(--text);}
 .tab-on{color:var(--text);border-bottom-color:var(--acc);}
 .tab-pip{font-size:9px;padding:2px 6px;border-radius:10px;background:var(--acc);color:var(--bg);font-weight:700;}
 .ftr{border-top:1px solid var(--border);padding:20px 0;font-size:11px;color:var(--muted);line-height:1.6;}
 
 /* Layout */
-.two-col{display:grid;grid-template-columns:370px 1fr;gap:28px;align-items:start;}
+.two-col{display:grid;grid-template-columns:370px 1fr;gap:20px;align-items:start;}
 @media(max-width:880px){.two-col{grid-template-columns:1fr;}}
-.col-inputs{display:flex;flex-direction:column;gap:16px;position:sticky;top:82px;max-height:calc(100vh - 100px);overflow-y:auto;padding-right:2px;scrollbar-width:thin;scrollbar-color:var(--border) transparent;}
+.col-inputs{display:flex;flex-direction:column;gap:7px;position:sticky;top:82px;max-height:calc(100vh - 100px);overflow-y:auto;padding-right:2px;scrollbar-width:thin;scrollbar-color:var(--border) transparent;}
 .col-inputs::-webkit-scrollbar{width:3px;}
 .col-inputs::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
-.col-outputs{display:flex;flex-direction:column;gap:16px;}
+.col-outputs{display:flex;flex-direction:column;gap:7px;}
 
 /* Cards */
-.card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:18px;}
-.card-hdr{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--border);}
-.card-ttl{font-family:var(--ff);font-size:17px;font-weight:500;letter-spacing:-.015em;}
-.flbl{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:5px;}
-.inp{width:100%;background:var(--surface2);border:1px solid var(--border2);color:var(--text);padding:7px 10px;font-size:13px;border-radius:5px;outline:none;transition:border-color .15s;font-family:var(--font);}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:12px;}
+.card-hdr{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--border);}
+.card-ttl{font-family:var(--ff);font-size:14px;font-weight:500;letter-spacing:-.015em;}
+.flbl{font-size:9px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);margin-bottom:3px;}
+.inp{width:100%;background:var(--surface2);border:1px solid var(--border2);color:var(--text);padding:5px 8px;font-size:12px;border-radius:5px;outline:none;transition:border-color .15s;font-family:var(--font);}
 .inp:focus{border-color:var(--acc);}
 select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath fill='%237a7168' d='M2 4l4 4 4-4z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 8px center;background-size:10px;padding-right:24px;}
-.lvr-box{height:33px;display:flex;align-items:center;font-family:'JetBrains Mono',monospace;font-size:17px;font-weight:500;padding:0 10px;background:var(--surface2);border:1px solid var(--border2);border-radius:5px;}
-.info-box{font-size:11px;padding:10px 12px;border-radius:5px;background:var(--acc-soft);border:1px solid rgba(212,120,58,.25);color:var(--acc);line-height:1.5;}
-.save-btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:11px;font-size:12px;letter-spacing:.04em;border-radius:6px;border:1px solid var(--acc);background:var(--acc-soft);color:var(--acc);transition:all .15s;}
+.lvr-box{height:27px;display:flex;align-items:center;font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:500;padding:0 8px;background:var(--surface2);border:1px solid var(--border2);border-radius:5px;}
+.info-box{font-size:11px;padding:7px 10px;border-radius:5px;background:var(--acc-soft);border:1px solid rgba(212,120,58,.25);color:var(--acc);line-height:1.5;}
+.save-btn{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;padding:8px;font-size:12px;letter-spacing:.04em;border-radius:6px;border:1px solid var(--acc);background:var(--acc-soft);color:var(--acc);transition:all .15s;}
 .save-btn:hover{background:var(--acc);color:var(--bg);}
 
 /* Stats */
-.stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;}
+.stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;}
 @media(max-width:700px){.stats-row{grid-template-columns:1fr 1fr;}}
-.stat{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px 16px;}
-.stat-l{font-size:10px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);margin-bottom:5px;}
-.stat-v{font-size:24px;line-height:1;margin-bottom:4px;}
+.stat{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:10px 12px;}
+.stat-l{font-size:9px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);margin-bottom:3px;}
+.stat-v{font-size:20px;line-height:1;margin-bottom:3px;}
 .stat-s{font-size:11px;color:var(--muted);}
 
 /* Callout */
-.callout{background:var(--surface);border:1px solid var(--border);border-left:3px solid;border-radius:8px;padding:18px;}
+.callout{background:var(--surface);border:1px solid var(--border);border-left:3px solid;border-radius:6px;padding:12px;}
 .savings-pill{margin-top:10px;padding:7px 10px;border-radius:4px;background:rgba(126,168,106,.1);border:1px solid rgba(126,168,106,.2);font-size:11px;color:var(--pos);}
 
 /* Table */
-.tbl{width:100%;border-collapse:collapse;font-size:13px;}
+.tbl{width:100%;border-collapse:collapse;font-size:12px;}
 .tbl-section{padding:10px 4px 4px;font-size:10px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);}
 
 /* Accordion */
 .acc{background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden;}
-.acc-hdr{width:100%;display:flex;justify-content:space-between;align-items:center;padding:14px 16px;background:none;border:none;cursor:pointer;transition:background .15s;}
+.acc-hdr{width:100%;display:flex;justify-content:space-between;align-items:center;padding:9px 12px;background:none;border:none;cursor:pointer;transition:background .15s;}
 .acc-hdr:hover{background:var(--surface2);}
-.acc-ttl{font-family:var(--ff);font-size:16px;font-weight:500;letter-spacing:-.01em;}
+.acc-ttl{font-family:var(--ff);font-size:13px;font-weight:500;letter-spacing:-.01em;}
 
 /* Buttons */
 .btn-accent{background:var(--acc);color:var(--bg);font-weight:500;padding:9px 18px;border-radius:5px;border:none;font-size:13px;cursor:pointer;transition:opacity .15s;}

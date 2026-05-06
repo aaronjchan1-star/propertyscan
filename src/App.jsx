@@ -368,7 +368,8 @@ function SuburbView({initialSuburb}){
     setLoading(true);setError(null);setData(null);
     try{
       const res=await fetch('https://ath-prox.aaronjchan1.workers.dev',{
-        method:'POST',headers:{'Content-Type':'application/json'},
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
         body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:2000,
           messages:[{role:'user',content:`You are an Australian property investment analyst. Analyse a ${beds}-bed ${propType.toLowerCase()} in ${suburb} around $${Number(budget).toLocaleString('en-AU')}. Search for current 2025/2026 data. Return ONLY valid JSON (no markdown): {"summary":"...","metrics":{"medianPrice":null,"medianWeeklyRent":null,"grossYield":null,"vacancyRate":null,"fiveYearGrowth":null,"rentGrowthYoY":null},"verdict":"buy"|"watch"|"avoid","verdictReason":"...","strengths":["..."],"risks":["..."],"demographics":"...","infrastructure":"...","comparableSuburbs":[{"name":"...","reason":"..."}]}`}],
           tools:[{type:'web_search_20250305',name:'web_search'}]}),

@@ -24,8 +24,12 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
+<<<<<<< HEAD
           node-version: 24
           cache: npm
+=======
+          node-version: 20
+>>>>>>> 11599d3ff6a95aaa18460ce32ce23dff09214398
 
       - name: Install dependencies
         run: npm install

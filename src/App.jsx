@@ -1,6 +1,6 @@
 // Build: 1778108810
 import React, { useState, useMemo } from 'react';
-import { Calculator, MapPin, Layers, Loader2, TrendingUp, TrendingDown, Sparkles, AlertCircle, ChevronDown, ChevronRight, Save, Trash2 } from 'lucide-react';
+import { Calculator, MapPin, Layers, Loader2, TrendingUp, TrendingDown, Sparkles, AlertCircle, ChevronDown, ChevronRight, Save, Trash2, Wallet } from 'lucide-react';
 
 const stampDutyCalc = {
   NSW:(p)=>{ if(p<=16000)return Math.max(20,p*.0125); if(p<=35000)return 200+(p-16000)*.015; if(p<=93000)return 485+(p-35000)*.0175; if(p<=351000)return 1500+(p-93000)*.035; if(p<=1168000)return 10530+(p-351000)*.045; if(p<=3505000)return 47295+(p-1168000)*.055; return 175830+(p-3505000)*.07; },
@@ -126,7 +126,7 @@ export default function App(){
             </div>
           </div>
           <div className="tabs">
-            {[{id:'calc',l:'Calculator',I:Calculator},{id:'suburb',l:'Suburb Insights',I:MapPin},{id:'compare',l:'Compare',I:Layers,b:saved.length}].map(({id,l,I,b})=>(
+            {[{id:'calc',l:'Calculator',I:Calculator},{id:'afford',l:'Buying Summary',I:Wallet},{id:'suburb',l:'Suburb Insights',I:MapPin},{id:'compare',l:'Compare',I:Layers,b:saved.length}].map(({id,l,I,b})=>(
               <button key={id} onClick={()=>setTab(id)} className={`tab${tab===id?' tab-on':''}`}>
                 <I size={13}/>{l}{b>0&&<span className="tab-pip">{b}</span>}
               </button>
@@ -137,6 +137,7 @@ export default function App(){
 
       <main className="wrap" style={{padding:'20px 0 48px'}}>
         {tab==='calc'&&<CalcView inputs={inputs} upd={upd} calc={calc} onSave={()=>setShowSave(true)}/>}
+        {tab==='afford'&&<AffordView inputs={inputs} upd={upd} calc={calc}/>}
         {tab==='suburb'&&<SuburbView initialSuburb={inputs.suburb}/>}
         {tab==='compare'&&<CompareView saved={saved} remove={id=>setSaved(p=>p.filter(s=>s.id!==id))} cur={{inputs,calc}}/>}
       </main>
@@ -351,6 +352,207 @@ function ProjChart({proj,pp}){
       <path d={area} fill="url(#eg)"/><path d={line} fill="none" stroke="var(--acc)" strokeWidth="1.5"/>
       {proj.map((r,i)=><circle key={i} cx={xs(i)} cy={ys(r.propValue)} r="2.5" fill="var(--acc)"/>)}
     </svg>
+  );
+}
+
+function AffordView({inputs,upd,calc}){
+  const p=Number(inputs.purchasePrice)||0;
+
+  // 5-year total interest paid (approximate)
+  const totalInterest5yr = inputs.loanType==='IO'
+    ? calc.annualInterest*5
+    : calc.annualInterest*5*1.05; // rough P&I estimate
+
+  // Total spent over 5 years (all cash out, no rent counted)
+  const totalOut5yr = calc.totalCashRequired + (calc.annualRepay*5) + (calc.totalOpEx*5);
+  // Net after rent income & tax benefit
+  const netCost5yr = calc.totalCashRequired + (-calc.cashflowAfterTax*5);
+
+  // Affordability check: mortgage repayment should be <30% of gross monthly income
+  const grossMonthlyIncome = Number(inputs.taxableIncome)/12;
+  const repaymentRatio = grossMonthlyIncome>0?(calc.monthlyRepay/grossMonthlyIncome)*100:0;
+  const affordableColor = repaymentRatio<=30?'var(--pos)':repaymentRatio<=40?'var(--acc)':'var(--neg)';
+  const affordableLabel = repaymentRatio<=30?'Comfortably affordable':repaymentRatio<=40?'Stretched but manageable':'High stress — exceeds 30% of income';
+
+  // Bar chart helper
+  const Bar=({label,value,total,color})=>{
+    const width=total>0?Math.min(100,(value/total)*100):0;
+    return(
+      <div style={{marginBottom:10}}>
+        <div style={{display:'flex',justifyContent:'space-between',fontSize:11,marginBottom:4}}>
+          <span style={{color:'var(--muted)'}}>{label}</span>
+          <span className="mono" style={{fontSize:12}}>{fmt(value)}</span>
+        </div>
+        <div style={{height:6,background:'var(--border)',borderRadius:3,overflow:'hidden'}}>
+          <div style={{height:'100%',width:`${width}%`,background:color,borderRadius:3,transition:'width .4s'}}/>
+        </div>
+      </div>
+    );
+  };
+
+  // Milestone timeline
+  const milestones=[
+    {label:'Exchange deposit (0.25%)',amount:p*0.0025,when:'At exchange'},
+    {label:'Full deposit',amount:Number(inputs.deposit),when:'At settlement'},
+    {label:'Stamp duty',amount:calc.stampDuty,when:'At settlement'},
+    {label:'Legal & inspection fees',amount:Number(inputs.legalFees)+Number(inputs.buildingInspection),when:'At settlement'},
+    {label:'LMI (if applicable)',amount:calc.lmi,when:'At settlement'},
+    {label:'Transfer & rego fees',amount:calc.tf+calc.mr,when:'At settlement'},
+    {label:'Moving & setup costs (est.)',amount:3000,when:'After settlement'},
+    {label:'Emergency fund (3 months rates+repayment)',amount:(calc.monthlyRepay+(calc.totalOpEx/12))*3,when:'Recommended buffer'},
+  ];
+
+  return(
+    <div style={{maxWidth:900,margin:'0 auto'}}>
+
+      {/* HERO */}
+      <div style={{marginBottom:24}}>
+        <div className="eyebrow" style={{marginBottom:8}}>Buying summary</div>
+        <h2 style={{fontFamily:'var(--ff)',fontSize:'clamp(24px,3vw,36px)',lineHeight:1,marginBottom:8}}>
+          How much will you <em>actually</em> spend?
+        </h2>
+        <p style={{fontSize:13,color:'var(--muted)',maxWidth:560}}>
+          Everything considered — upfront costs, ongoing holding costs, tax benefits, and what it'll cost you net over 5 years. Based on your Calculator inputs.
+        </p>
+      </div>
+
+      {/* KEY NUMBERS — top row */}
+      <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:10,marginBottom:16}}>
+        {[
+          {l:'Cash needed to buy',v:fmt(calc.totalCashRequired),s:'Deposit + all upfront costs',c:'var(--acc)'},
+          {l:'Monthly out of pocket',v:fmt(Math.max(0,-calc.cashflowAfterTax/12)),s:'After rent & tax benefit',c:calc.cashflowAfterTaxWeekly>=0?'var(--pos)':'var(--neg)'},
+          {l:'Net cost over 5 years',v:fmt(Math.max(0,netCost5yr)),s:'Total cash invested (net of rent+tax)',c:'var(--text)'},
+        ].map(({l,v,s,c})=>(
+          <div key={l} style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:8,padding:'14px 16px'}}>
+            <div style={{fontSize:10,letterSpacing:'.07em',textTransform:'uppercase',color:'var(--muted)',marginBottom:5}}>{l}</div>
+            <div className="mono" style={{fontSize:26,lineHeight:1,color:c,marginBottom:4}}>{v}</div>
+            <div style={{fontSize:11,color:'var(--muted)'}}>{s}</div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16}}>
+
+        {/* LEFT COLUMN */}
+        <div style={{display:'flex',flexDirection:'column',gap:14}}>
+
+          {/* UPFRONT BREAKDOWN */}
+          <div style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:8,padding:16}}>
+            <div style={{fontSize:13,fontFamily:'var(--ff)',fontWeight:500,marginBottom:14}}>Upfront cost breakdown</div>
+            <Bar label="Deposit" value={Number(inputs.deposit)} total={calc.totalCashRequired} color="var(--acc)"/>
+            <Bar label="Stamp duty" value={calc.stampDuty} total={calc.totalCashRequired} color="#c07a3a"/>
+            {calc.lmi>0&&<Bar label="LMI" value={calc.lmi} total={calc.totalCashRequired} color="var(--neg)"/>}
+            <Bar label="Legal & inspection" value={Number(inputs.legalFees)+Number(inputs.buildingInspection)} total={calc.totalCashRequired} color="#7a8a6a"/>
+            <Bar label="Transfer & rego fees" value={calc.tf+calc.mr} total={calc.totalCashRequired} color="var(--muted)"/>
+            {calc.fhogGrant>0&&(
+              <div style={{marginTop:8,padding:'8px 10px',borderRadius:5,background:'rgba(126,168,106,.1)',border:'1px solid rgba(126,168,106,.2)',fontSize:11,color:'var(--pos)'}}>
+                🎉 FHOG grant reduces cash needed by {fmt(calc.fhogGrant)}
+              </div>
+            )}
+            <div style={{borderTop:'1px solid var(--border)',marginTop:12,paddingTop:10,display:'flex',justifyContent:'space-between',fontSize:13,fontWeight:600}}>
+              <span>Total cash to close</span>
+              <span className="mono" style={{color:'var(--acc)'}}>{fmt(calc.totalCashRequired)}</span>
+            </div>
+          </div>
+
+          {/* MONTHLY CASHFLOW */}
+          <div style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:8,padding:16}}>
+            <div style={{fontSize:13,fontFamily:'var(--ff)',fontWeight:500,marginBottom:14}}>Monthly money flow</div>
+            {[
+              {l:'Rental income',v:fmt(calc.effectiveRent/12),pos:true},
+              {l:'Tax benefit (neg. gearing)',v:fmt(Math.max(0,calc.taxBenefit/12)),pos:true},
+              {l:'Mortgage repayment',v:`-${fmt(calc.monthlyRepay)}`,pos:false},
+              {l:'Council & water rates',v:`-${fmt((Number(inputs.councilRates)+Number(inputs.waterRates))/12)}`,pos:false},
+              {l:'Strata / body corp',v:`-${fmt(Number(inputs.strataFees)/12)}`,pos:false},
+              {l:'Insurance',v:`-${fmt(Number(inputs.insurance)/12)}`,pos:false},
+              {l:'PM fees & maintenance',v:`-${fmt((calc.pmFees+calc.maintenance)/12)}`,pos:false},
+            ].map(({l,v,pos})=>(
+              <div key={l} style={{display:'flex',justifyContent:'space-between',fontSize:12,padding:'5px 0',borderBottom:'1px solid var(--border)'}}>
+                <span style={{color:'var(--muted)'}}>{l}</span>
+                <span className="mono" style={{color:pos?'var(--pos)':'var(--text)'}}>{v}</span>
+              </div>
+            ))}
+            <div style={{display:'flex',justifyContent:'space-between',fontSize:13,fontWeight:600,marginTop:10,paddingTop:8}}>
+              <span>Net monthly {calc.cashflowAfterTaxWeekly>=0?'surplus':'shortfall'}</span>
+              <span className="mono" style={{color:calc.cashflowAfterTaxWeekly>=0?'var(--pos)':'var(--neg)'}}>
+                {calc.cashflowAfterTaxWeekly>=0?'+':''}{fmt(calc.cashflowAfterTax/12)}
+              </span>
+            </div>
+          </div>
+
+        </div>
+
+        {/* RIGHT COLUMN */}
+        <div style={{display:'flex',flexDirection:'column',gap:14}}>
+
+          {/* AFFORDABILITY CHECK */}
+          <div style={{background:'var(--surface)',border:'1px solid var(--border)',borderLeft:`3px solid ${affordableColor}`,borderRadius:8,padding:16}}>
+            <div style={{fontSize:13,fontFamily:'var(--ff)',fontWeight:500,marginBottom:12}}>Affordability check</div>
+            <div style={{fontSize:11,color:'var(--muted)',marginBottom:4}}>Mortgage repayments vs gross income</div>
+            <div style={{height:8,background:'var(--border)',borderRadius:4,overflow:'hidden',marginBottom:8}}>
+              <div style={{height:'100%',width:`${Math.min(100,repaymentRatio)}%`,background:affordableColor,borderRadius:4}}/>
+            </div>
+            <div style={{display:'flex',justifyContent:'space-between',marginBottom:12}}>
+              <span className="mono" style={{fontSize:20,color:affordableColor}}>{pct(repaymentRatio,1)}</span>
+              <span style={{fontSize:11,color:'var(--muted)',textAlign:'right',lineHeight:1.4}}>{affordableLabel}</span>
+            </div>
+            {[
+              {l:'Gross monthly income',v:fmt(grossMonthlyIncome)},
+              {l:'Monthly repayment',v:fmt(calc.monthlyRepay)},
+              {l:'All monthly costs (excl. repayment)',v:fmt(calc.totalOpEx/12)},
+              {l:'Monthly rent received',v:fmt(calc.effectiveRent/12)},
+              {l:'Net monthly cost',v:fmt(Math.abs(calc.cashflowAfterTax/12))},
+            ].map(({l,v})=>(
+              <div key={l} style={{display:'flex',justifyContent:'space-between',fontSize:11,padding:'4px 0',borderBottom:'1px solid var(--border)'}}>
+                <span style={{color:'var(--muted)'}}>{l}</span>
+                <span className="mono">{v}</span>
+              </div>
+            ))}
+          </div>
+
+          {/* PAYMENT TIMELINE */}
+          <div style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:8,padding:16}}>
+            <div style={{fontSize:13,fontFamily:'var(--ff)',fontWeight:500,marginBottom:14}}>When do you pay what?</div>
+            {milestones.filter(m=>m.amount>0).map((m,i)=>(
+              <div key={i} style={{display:'grid',gridTemplateColumns:'1fr auto auto',gap:8,alignItems:'center',padding:'6px 0',borderBottom:'1px solid var(--border)',fontSize:12}}>
+                <span>{m.label}</span>
+                <span style={{fontSize:10,color:'var(--muted)',whiteSpace:'nowrap'}}>{m.when}</span>
+                <span className="mono" style={{textAlign:'right'}}>{fmt(m.amount)}</span>
+              </div>
+            ))}
+          </div>
+
+          {/* 5-YEAR SUMMARY */}
+          <div style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:8,padding:16}}>
+            <div style={{fontSize:13,fontFamily:'var(--ff)',fontWeight:500,marginBottom:14}}>5-year total picture</div>
+            {[
+              {l:'Cash paid upfront',v:fmt(calc.totalCashRequired),muted:false},
+              {l:'Mortgage repayments (5yr)',v:fmt(calc.annualRepay*5),muted:false},
+              {l:'Operating costs (5yr)',v:fmt(calc.totalOpEx*5),muted:false},
+              {l:'Rent received (5yr)',v:`-${fmt(calc.effectiveRent*5)}`,muted:false,pos:true},
+              {l:'Tax benefits (5yr)',v:`-${fmt(Math.max(0,calc.taxBenefit)*5)}`,muted:false,pos:true},
+              {l:'Estimated property value',v:fmt(calc.projection[4].propValue),muted:true},
+              {l:'Your equity at year 5',v:fmt(calc.projection[4].equity),muted:true},
+            ].map(({l,v,pos,muted})=>(
+              <div key={l} style={{display:'flex',justifyContent:'space-between',fontSize:12,padding:'5px 0',borderBottom:'1px solid var(--border)'}}>
+                <span style={{color:muted?'var(--acc)':'var(--muted)'}}>{l}</span>
+                <span className="mono" style={{color:pos?'var(--pos)':muted?'var(--acc)':'var(--text)'}}>{v}</span>
+              </div>
+            ))}
+            <div style={{display:'flex',justifyContent:'space-between',fontSize:13,fontWeight:600,marginTop:10,paddingTop:8,borderTop:'1px solid var(--border)'}}>
+              <span>Net out of pocket (5yr)</span>
+              <span className="mono" style={{color:'var(--acc)'}}>{fmt(Math.max(0,netCost5yr))}</span>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      {/* BOTTOM NOTE */}
+      <div style={{marginTop:16,padding:'12px 16px',borderRadius:6,background:'var(--surface)',border:'1px solid var(--border)',fontSize:11,color:'var(--muted)',lineHeight:1.6}}>
+        💡 <strong style={{color:'var(--text)'}}>Tip:</strong> Adjust your inputs in the <strong style={{color:'var(--text)'}}>Calculator</strong> tab — this summary updates automatically. The 5-year figures assume constant rent, costs, and {pct(Number(inputs.capitalGrowthPct),1)} annual capital growth.
+      </div>
+    </div>
   );
 }
 

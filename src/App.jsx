@@ -92,12 +92,15 @@ export default function App(){
     const fhogGrant=getFhog(inputs.state,p,inputs.isNewBuild,inputs.buyerType);
     const tf=170,mr=165;
     const upfrontCosts=stampDuty+lmi+tf+mr+Number(inputs.legalFees)+Number(inputs.buildingInspection);
-    const totalCashRequired=dep+upfrontCosts-fhogGrant;
+    // With guarantor, you don't need the deposit cash — just the upfront costs
+    const totalCashRequired=(inputs.useGuarantor?0:effectiveDep)+upfrontCosts-fhogGrant;
     const totalSavings=stampDutySaving+lmiSaving+fhogGrant;
-    const grossRent=(Number(inputs.weeklyRent)||0)*52;
-    const vacancyLoss=(Number(inputs.weeklyRent)||0)*(Number(inputs.vacancyWeeks)||0);
+    // PPOR = buying to live in (no rental income, no negative gearing in AU law)
+    const isPPOR=inputs.buyerType==='fhb'&&inputs.fhbPurpose==='ppor';
+    const grossRent=isPPOR?0:(Number(inputs.weeklyRent)||0)*52;
+    const vacancyLoss=isPPOR?0:(Number(inputs.weeklyRent)||0)*(Number(inputs.vacancyWeeks)||0);
     const effectiveRent=grossRent-vacancyLoss;
-    const pmFees=effectiveRent*(Number(inputs.pmFeesPct)||0)/100;
+    const pmFees=isPPOR?0:effectiveRent*(Number(inputs.pmFeesPct)||0)/100;
     const maintenance=p*(Number(inputs.maintenancePct)||0)/100;
     const totalOpEx=Number(inputs.councilRates)+Number(inputs.waterRates)+Number(inputs.strataFees)+Number(inputs.insurance)+Number(inputs.landTax)+pmFees+maintenance;
     // Offset reduces effective loan balance for interest calculation
@@ -115,7 +118,8 @@ export default function App(){
     const netYield=p>0?((effectiveRent-totalOpEx)/p)*100:0;
     const taxableLossOrGain=effectiveRent-totalOpEx-annualInterest-Number(inputs.depreciation);
     const marginalRate=getMarginalRate(Number(inputs.taxableIncome));
-    const taxBenefit=taxableLossOrGain<0?-taxableLossOrGain*marginalRate:-taxableLossOrGain*marginalRate;
+    // PPOR: no tax deductions (mortgage interest not deductible for owner-occupied in AU)
+    const taxBenefit=isPPOR?0:(taxableLossOrGain<0?-taxableLossOrGain*marginalRate:-taxableLossOrGain*marginalRate);
     const cashflowAfterTax=cashflowBeforeTax+taxBenefit;
     const cashflowAfterTaxWeekly=cashflowAfterTax/52;
     const cashOnCash=totalCashRequired>0?(cashflowAfterTax/totalCashRequired)*100:0;
@@ -138,7 +142,7 @@ export default function App(){
     }
     let breakEvenYear=null;
     for(let i=0;i<projection.length;i++){if(projection[i].totalReturn>=upfrontCosts){breakEvenYear=projection[i].year;break;}}
-    return{loan,lvr,stampDuty,fullDuty,stampDutySaving,lmi,lmiSaving,fhogGrant,tf,mr,upfrontCosts,totalCashRequired,totalSavings,grossRent,vacancyLoss,effectiveRent,pmFees,maintenance,totalOpEx,monthlyRepay,annualRepay,annualInterest,interestSavingFromOffset,cashflowBeforeTax,cashflowWeekly:cashflowBeforeTax/52,cashflowAfterTax,cashflowAfterTaxWeekly,grossYield,netYield,cashOnCash,taxableLossOrGain,marginalRate,taxBenefit,projection,breakEvenYear,combinedIncome,dependantAnnualCost,otherBillsAnnual,totalLivingCosts,disposableIncome,repaymentRatio,grossMonthlyIncome,fhbsActive,offset};
+    return{loan,lvr,stampDuty,fullDuty,stampDutySaving,lmi,lmiSaving,fhogGrant,tf,mr,upfrontCosts,totalCashRequired,totalSavings,isPPOR,effectiveDep,grossRent,vacancyLoss,effectiveRent,pmFees,maintenance,totalOpEx,monthlyRepay,annualRepay,annualInterest,interestSavingFromOffset,cashflowBeforeTax,cashflowWeekly:cashflowBeforeTax/52,cashflowAfterTax,cashflowAfterTaxWeekly,grossYield,netYield,cashOnCash,taxableLossOrGain,marginalRate,taxBenefit,projection,breakEvenYear,combinedIncome,dependantAnnualCost,otherBillsAnnual,totalLivingCosts,disposableIncome,repaymentRatio,grossMonthlyIncome,fhbsActive,offset};
   },[inputs]);
 
   return(
@@ -385,148 +389,145 @@ function ProjChart({proj,pp}){
 
 function AffordView({inputs,upd,calc}){
   const p=Number(inputs.purchasePrice)||0;
-  const netCost5yr=calc.totalCashRequired+(-calc.cashflowAfterTax*5);
-  const affordableColor=calc.repaymentRatio<=30?'var(--pos)':calc.repaymentRatio<=40?'var(--acc)':'var(--neg)';
-  const affordableLabel=calc.repaymentRatio<=30?'Comfortably affordable':calc.repaymentRatio<=40?'Stretched but manageable':'High stress — exceeds income comfort zone';
+  const {isPPOR}=calc;
 
-  const Bar=({label,value,total,color,note})=>{
-    const w=total>0?Math.min(100,(value/total)*100):0;
-    return(
-      <div style={{marginBottom:9}}>
-        <div style={{display:'flex',justifyContent:'space-between',fontSize:11,marginBottom:3}}>
-          <span style={{color:'var(--muted)'}}>{label}{note&&<span style={{color:'var(--acc)',marginLeft:6}}>{note}</span>}</span>
-          <span className="mono" style={{fontSize:12}}>{fmt(value)}</span>
-        </div>
-        <div style={{height:5,background:'var(--border)',borderRadius:3,overflow:'hidden'}}>
-          <div style={{height:'100%',width:`${w}%`,background:color,borderRadius:3,transition:'width .4s'}}/>
-        </div>
-      </div>
-    );
-  };
+  // Affordability colour
+  const affordColor=calc.repaymentRatio<=30?'var(--pos)':calc.repaymentRatio<=40?'var(--acc)':'var(--neg)';
+  const affordLabel=calc.repaymentRatio<=30?'Comfortable (under 30%)':calc.repaymentRatio<=40?'Stretched (30–40%)':'High stress (over 40%)';
 
-  // FHBS price caps by state
+  // FHBS eligibility
   const fhbsCaps={NSW:900000,VIC:800000,QLD:700000,WA:600000,SA:600000,TAS:600000,ACT:750000,NT:600000};
   const fhbsEligible=inputs.buyerType==='fhb'&&inputs.fhbPurpose==='ppor';
   const fhbsCap=fhbsCaps[inputs.state]||750000;
   const fhbsIncomeOk=calc.combinedIncome<=(inputs.incomeType==='combined'?200000:125000);
   const fhbsPriceOk=p<=fhbsCap;
-  const fhbsCanEnable=fhbsEligible&&fhbsIncomeOk&&fhbsPriceOk;
 
-  const milestones=[
-    {l:'Exchange deposit (0.25%)',v:p*0.0025,when:'At exchange'},
-    {l:'Full deposit (balance)',v:Number(inputs.deposit)-p*0.0025,when:'At settlement'},
-    {l:'Stamp duty',v:calc.stampDuty,when:'At settlement'},
-    {l:'Legal & inspection',v:Number(inputs.legalFees)+Number(inputs.buildingInspection),when:'At settlement'},
-    {l:'LMI (if applicable)',v:calc.lmi,when:'At settlement'},
-    {l:'Moving & setup (est.)',v:3000,when:'After settlement'},
-    {l:'3-month emergency buffer',v:(calc.monthlyRepay+calc.totalOpEx/12)*3,when:'Recommended'},
-  ];
+  // Helper: format three time periods from annual figure
+  const wmy=(annual)=>({w:annual/52,m:annual/12,y:annual});
+
+  // Costs per period
+  const repay=wmy(calc.annualRepay);
+  const council=wmy(Number(inputs.councilRates));
+  const water=wmy(Number(inputs.waterRates));
+  const strata=wmy(Number(inputs.strataFees));
+  const insure=wmy(Number(inputs.insurance));
+  const maint=wmy(calc.maintenance);
+  const pm=wmy(calc.pmFees);
+  const vacancy=wmy(isPPOR?0:(Number(inputs.weeklyRent)||0)*(Number(inputs.vacancyWeeks)||0));
+  const landtax=wmy(Number(inputs.landTax));
+  const rent=wmy(calc.effectiveRent);
+  const taxBen=wmy(Math.max(0,calc.taxBenefit));
+  const offsetSave=wmy(calc.interestSavingFromOffset);
+  const depend=wmy(calc.dependantAnnualCost);
+  const bills=wmy(calc.otherBillsAnnual);
+
+  // Totals
+  const propCostAnnual=calc.annualRepay+calc.totalOpEx;
+  const propCost=wmy(propCostAnnual);
+  const incomeAnnual=calc.effectiveRent+Math.max(0,calc.taxBenefit);
+  const income=wmy(incomeAnnual);
+  const netAnnual=propCostAnnual-incomeAnnual;
+  const net=wmy(netAnnual);
+  const totalOutAnnual=netAnnual+calc.dependantAnnualCost+calc.otherBillsAnnual;
+  const totalOut=wmy(totalOutAnnual);
+
+  // 5yr
+  const net5yr=calc.totalCashRequired+(netAnnual*5);
+
+  const C=(s,color)=><span className="mono" style={{color:color||'var(--text)',textAlign:'right',display:'block'}}>{s}</span>;
+  const TRow=({label,wkly,mthly,yrly,color,bold,sub,indent})=>(
+    <tr style={{borderTop:'1px solid var(--border)'}}>
+      <td style={{padding:'6px 4px 6px '+(indent?'16px':'4px'),fontSize:12,fontWeight:bold?600:400,color:sub?'var(--muted)':'var(--text)'}}>
+        {label}
+      </td>
+      <td style={{padding:'6px 4px',textAlign:'right'}}><span className="mono" style={{fontSize:12,color:color||'var(--text)',fontWeight:bold?600:400}}>{wkly}</span></td>
+      <td style={{padding:'6px 4px',textAlign:'right'}}><span className="mono" style={{fontSize:12,color:color||'var(--text)',fontWeight:bold?600:400}}>{mthly}</span></td>
+      <td style={{padding:'6px 4px',textAlign:'right'}}><span className="mono" style={{fontSize:12,color:color||'var(--text)',fontWeight:bold?600:400}}>{yrly}</span></td>
+    </tr>
+  );
+  const thead=<thead><tr style={{borderBottom:'2px solid var(--border)'}}>
+    <th style={{textAlign:'left',padding:'6px 4px',fontSize:10,letterSpacing:'.08em',textTransform:'uppercase',color:'var(--muted)',fontWeight:400,width:'45%'}}>Item</th>
+    <th style={{textAlign:'right',padding:'6px 4px',fontSize:10,letterSpacing:'.08em',textTransform:'uppercase',color:'var(--muted)',fontWeight:400}}>Weekly</th>
+    <th style={{textAlign:'right',padding:'6px 4px',fontSize:10,letterSpacing:'.08em',textTransform:'uppercase',color:'var(--muted)',fontWeight:400}}>Monthly</th>
+    <th style={{textAlign:'right',padding:'6px 4px',fontSize:10,letterSpacing:'.08em',textTransform:'uppercase',color:'var(--muted)',fontWeight:400}}>Yearly</th>
+  </tr></thead>;
 
   return(
     <div style={{maxWidth:1100,margin:'0 auto'}}>
-      <div style={{marginBottom:20}}>
+      <div style={{marginBottom:16}}>
         <div className="eyebrow" style={{marginBottom:6}}>Buying summary</div>
-        <h2 style={{fontFamily:'var(--ff)',fontSize:'clamp(22px,3vw,34px)',lineHeight:1,marginBottom:6}}>
+        <h2 style={{fontFamily:'var(--ff)',fontSize:'clamp(22px,3vw,32px)',lineHeight:1,marginBottom:6}}>
           How much will you <em>actually</em> spend?
         </h2>
-        <p style={{fontSize:12,color:'var(--muted)'}}>Factor in your full financial picture — income, dependants, offset, schemes, and all bills. Updates from your Calculator inputs.</p>
+        <div style={{display:'flex',gap:8,alignItems:'center',fontSize:12,color:'var(--muted)'}}>
+          <span>Buying as:</span>
+          <span style={{padding:'3px 10px',borderRadius:4,fontSize:11,background:isPPOR?'var(--pos)':'var(--acc)',color:'var(--bg)',fontWeight:600}}>
+            {isPPOR?'Owner-occupier (PPOR)':'Investment property'}
+          </span>
+          {isPPOR
+            ?<span>No rental income · No negative gearing · All mortgage costs are yours to bear</span>
+            :<span>Rental income offsets costs · Negative gearing tax benefit applies</span>}
+        </div>
       </div>
 
-      {/* ── INPUTS PANEL ── */}
-      <div style={{display:'grid',gridTemplateColumns:'320px 1fr',gap:20,alignItems:'start'}}>
+      <div style={{display:'grid',gridTemplateColumns:'300px 1fr',gap:20,alignItems:'start'}}>
+
+        {/* ── LEFT INPUTS ── */}
         <div style={{display:'flex',flexDirection:'column',gap:10}}>
 
-          {/* INCOME */}
           <div style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:8,padding:14}}>
-            <div style={{fontFamily:'var(--ff)',fontSize:14,fontWeight:500,marginBottom:12,paddingBottom:8,borderBottom:'1px solid var(--border)'}}>Income</div>
-            <div style={{display:'flex',flexDirection:'column',gap:10}}>
-              <F l="Household type">
-                <Tog opts={[['single','Single'],['combined','Combined']]} val={inputs.incomeType} set={v=>upd('incomeType',v)}/>
-              </F>
+            <div style={{fontFamily:'var(--ff)',fontSize:14,fontWeight:500,marginBottom:10,paddingBottom:8,borderBottom:'1px solid var(--border)'}}>Income</div>
+            <div style={{display:'flex',flexDirection:'column',gap:8}}>
+              <F l="Household"><Tog opts={[['single','Single'],['combined','Combined']]} val={inputs.incomeType} set={v=>upd('incomeType',v)}/></F>
               <F l="Primary income" pre="$"><Num value={inputs.taxableIncome} onChange={v=>upd('taxableIncome',v)}/></F>
-              {inputs.incomeType==='combined'&&(
-                <F l="Partner's income" pre="$"><Num value={inputs.income2} onChange={v=>upd('income2',v)}/></F>
-              )}
-              <div style={{display:'flex',justifyContent:'space-between',fontSize:11,color:'var(--muted)',padding:'2px 0'}}>
-                <span>Combined household income</span>
-                <span className="mono">{fmt(calc.combinedIncome)}</span>
+              {inputs.incomeType==='combined'&&<F l="Partner's income" pre="$"><Num value={inputs.income2} onChange={v=>upd('income2',v)}/></F>}
+              <div style={{display:'flex',justifyContent:'space-between',fontSize:11,color:'var(--muted)'}}>
+                <span>Combined gross</span><span className="mono">{fmt(calc.combinedIncome)}/yr</span>
               </div>
             </div>
           </div>
 
-          {/* DEPENDANTS */}
           <div style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:8,padding:14}}>
-            <div style={{fontFamily:'var(--ff)',fontSize:14,fontWeight:500,marginBottom:12,paddingBottom:8,borderBottom:'1px solid var(--border)'}}>Dependants</div>
-            <div style={{display:'flex',flexDirection:'column',gap:10}}>
-              <F l="Number of dependants">
-                <Sel value={inputs.dependants} onChange={v=>upd('dependants',Number(v))} opts={[0,1,2,3,4,5].map(n=>({v:n,l:n===0?'None':String(n)}))}/>
-              </F>
-              {inputs.dependants>0&&(
-                <F l="Est. weekly cost per dependant" pre="$">
-                  <Num value={inputs.dependantCostPerWeek} onChange={v=>upd('dependantCostPerWeek',v)}/>
-                </F>
-              )}
-              {inputs.dependants>0&&(
-                <div style={{fontSize:11,color:'var(--muted)',display:'flex',justifyContent:'space-between'}}>
-                  <span>Annual dependant cost</span>
-                  <span className="mono" style={{color:'var(--neg)'}}>{fmt(calc.dependantAnnualCost)}</span>
-                </div>
-              )}
+            <div style={{fontFamily:'var(--ff)',fontSize:14,fontWeight:500,marginBottom:10,paddingBottom:8,borderBottom:'1px solid var(--border)'}}>Dependants</div>
+            <div style={{display:'flex',flexDirection:'column',gap:8}}>
+              <F l="Number"><Sel value={inputs.dependants} onChange={v=>upd('dependants',Number(v))} opts={[0,1,2,3,4,5].map(n=>({v:n,l:n===0?'None':String(n)}))}/></F>
+              {inputs.dependants>0&&<F l="Weekly cost each" pre="$"><Num value={inputs.dependantCostPerWeek} onChange={v=>upd('dependantCostPerWeek',v)}/></F>}
             </div>
           </div>
 
-          {/* OTHER BILLS */}
           <div style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:8,padding:14}}>
-            <div style={{fontFamily:'var(--ff)',fontSize:14,fontWeight:500,marginBottom:12,paddingBottom:8,borderBottom:'1px solid var(--border)'}}>Other bills</div>
-            <div style={{display:'flex',flexDirection:'column',gap:10}}>
-              <F l="Monthly bills (utilities, food, transport, subscriptions etc.)" pre="$">
-                <Num value={inputs.otherBillsMonthly} onChange={v=>upd('otherBillsMonthly',v)}/>
-              </F>
-              <div style={{fontSize:11,color:'var(--muted)',display:'flex',justifyContent:'space-between'}}>
-                <span>Annual other bills</span>
-                <span className="mono" style={{color:'var(--neg)'}}>{fmt(calc.otherBillsAnnual)}</span>
-              </div>
-            </div>
+            <div style={{fontFamily:'var(--ff)',fontSize:14,fontWeight:500,marginBottom:10,paddingBottom:8,borderBottom:'1px solid var(--border)'}}>Other bills</div>
+            <F l="Monthly (utilities, food, transport etc.)" pre="$"><Num value={inputs.otherBillsMonthly} onChange={v=>upd('otherBillsMonthly',v)}/></F>
           </div>
 
-          {/* SCHEMES & OFFSET */}
           <div style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:8,padding:14}}>
-            <div style={{fontFamily:'var(--ff)',fontSize:14,fontWeight:500,marginBottom:12,paddingBottom:8,borderBottom:'1px solid var(--border)'}}>Schemes & offset</div>
-            <div style={{display:'flex',flexDirection:'column',gap:10}}>
-              {/* FHBS */}
+            <div style={{fontFamily:'var(--ff)',fontSize:14,fontWeight:500,marginBottom:10,paddingBottom:8,borderBottom:'1px solid var(--border)'}}>Schemes & offset</div>
+            <div style={{display:'flex',flexDirection:'column',gap:8}}>
               <div>
-                <div className="flbl" style={{marginBottom:4}}>First Home Guarantee Scheme (FHBS)</div>
-                <Tog opts={[[false,'Not using'],[true,'Apply FHBS']]} val={inputs.useFHBS} set={v=>upd('useFHBS',v)}/>
-                {inputs.useFHBS&&!fhbsEligible&&<div style={{fontSize:10,color:'var(--neg)',marginTop:4}}>Requires FHB + PPOR selection in Calculator tab</div>}
-                {inputs.useFHBS&&fhbsEligible&&!fhbsIncomeOk&&<div style={{fontSize:10,color:'var(--neg)',marginTop:4}}>Income exceeds FHBS limit ({inputs.incomeType==='combined'?'$200k combined':'$125k single'})</div>}
-                {inputs.useFHBS&&fhbsEligible&&!fhbsPriceOk&&<div style={{fontSize:10,color:'var(--neg)',marginTop:4}}>Price exceeds {inputs.state} cap of {fmt(fhbsCap)}</div>}
-                {calc.fhbsActive&&<div style={{fontSize:10,color:'var(--pos)',marginTop:4}}>✓ Active — 5% deposit accepted, LMI waived</div>}
+                <div className="flbl" style={{marginBottom:4}}>FHBS (5% deposit, no LMI)</div>
+                <Tog opts={[[false,'Not using'],[true,'Apply']]} val={inputs.useFHBS} set={v=>upd('useFHBS',v)}/>
+                {inputs.useFHBS&&!fhbsEligible&&<div style={{fontSize:10,color:'var(--neg)',marginTop:3}}>Requires FHB + PPOR in Calculator</div>}
+                {inputs.useFHBS&&fhbsEligible&&!fhbsIncomeOk&&<div style={{fontSize:10,color:'var(--neg)',marginTop:3}}>Income exceeds cap ({inputs.incomeType==='combined'?'$200k':'$125k'})</div>}
+                {inputs.useFHBS&&fhbsEligible&&!fhbsPriceOk&&<div style={{fontSize:10,color:'var(--neg)',marginTop:3}}>Exceeds {inputs.state} cap of {fmt(fhbsCap)}</div>}
+                {calc.fhbsActive&&<div style={{fontSize:10,color:'var(--pos)',marginTop:3}}>✓ Active — LMI waived, 5% deposit accepted</div>}
               </div>
-              {/* Guarantor */}
-              <F l="Family guarantor?">
-                <Tog opts={[[false,'No'],[true,'Yes']]} val={inputs.useGuarantor} set={v=>upd('useGuarantor',v)}/>
-              </F>
-              {inputs.useGuarantor&&<div style={{fontSize:10,color:'var(--pos)'}}>✓ LMI waived — guarantor's property used as security</div>}
-              {/* Offset */}
-              <F l="Offset account balance" pre="$">
-                <Num value={inputs.offsetBalance} onChange={v=>upd('offsetBalance',v)}/>
-              </F>
-              {calc.offset>0&&(
-                <div style={{fontSize:10,color:'var(--pos)'}}>✓ Saves {fmt(calc.interestSavingFromOffset)}/yr in interest</div>
-              )}
+              <F l="Guarantor?"><Tog opts={[[false,'No'],[true,'Yes']]} val={inputs.useGuarantor} set={v=>upd('useGuarantor',v)}/></F>
+              {inputs.useGuarantor&&<div style={{fontSize:10,color:'var(--pos)'}}>✓ No deposit needed — LMI waived</div>}
+              <F l="Offset balance" pre="$"><Num value={inputs.offsetBalance} onChange={v=>upd('offsetBalance',v)}/></F>
+              {calc.offset>0&&<div style={{fontSize:10,color:'var(--pos)'}}>✓ Saves {fmt(calc.interestSavingFromOffset)}/yr interest</div>}
             </div>
           </div>
         </div>
 
-        {/* ── RIGHT: RESULTS ── */}
-        <div style={{display:'flex',flexDirection:'column',gap:12}}>
+        {/* ── RIGHT RESULTS ── */}
+        <div style={{display:'flex',flexDirection:'column',gap:14}}>
 
-          {/* KEY NUMBERS */}
+          {/* KEY 3 */}
           <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8}}>
             {[
-              {l:'Cash to buy',v:fmt(calc.totalCashRequired),s:'Deposit + all upfront costs',c:'var(--acc)'},
-              {l:'Monthly out of pocket',v:fmt(Math.abs(calc.cashflowAfterTax/12)),s:calc.cashflowAfterTaxWeekly>=0?'Monthly surplus (property pays you)':'After rent & tax benefit',c:calc.cashflowAfterTaxWeekly>=0?'var(--pos)':'var(--neg)'},
-              {l:'Disposable income',v:fmt(calc.disposableIncome/12),s:'After income tax, bills & dependants',c:calc.disposableIncome>calc.annualRepay*1.2?'var(--pos)':'var(--neg)'},
+              {l:'Cash to buy',v:fmt(calc.totalCashRequired),s:'Deposit + stamp duty + costs',c:'var(--acc)'},
+              {l:isPPOR?'Weekly cost to own':'Weekly out of pocket',v:fmt(isPPOR?propCost.w:Math.abs(net.w)),s:isPPOR?'Mortgage + all holding costs':'After rent & tax benefit',c:isPPOR?'var(--neg)':net.w>0?'var(--neg)':'var(--pos)'},
+              {l:'Net cost — 5 years',v:fmt(Math.max(0,net5yr)),s:isPPOR?'Total spend after 5 years':'Total invested (net of rent+tax)',c:'var(--text)'},
             ].map(({l,v,s,c})=>(
               <div key={l} style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:8,padding:'12px 14px'}}>
                 <div style={{fontSize:9,letterSpacing:'.07em',textTransform:'uppercase',color:'var(--muted)',marginBottom:4}}>{l}</div>
@@ -537,119 +538,137 @@ function AffordView({inputs,upd,calc}){
           </div>
 
           {/* AFFORDABILITY */}
-          <div style={{background:'var(--surface)',border:'1px solid var(--border)',borderLeft:`3px solid ${affordableColor}`,borderRadius:8,padding:14}}>
-            <div style={{fontFamily:'var(--ff)',fontSize:14,fontWeight:500,marginBottom:10}}>Affordability check</div>
-            <div style={{fontSize:10,color:'var(--muted)',marginBottom:4}}>Repayments as % of disposable income (after bills & dependants)</div>
-            <div style={{height:7,background:'var(--border)',borderRadius:4,overflow:'hidden',marginBottom:8}}>
-              <div style={{height:'100%',width:`${Math.min(100,calc.repaymentRatio)}%`,background:affordableColor,borderRadius:4}}/>
+          <div style={{background:'var(--surface)',border:'1px solid var(--border)',borderLeft:`3px solid ${affordColor}`,borderRadius:8,padding:14}}>
+            <div style={{fontFamily:'var(--ff)',fontSize:14,fontWeight:500,marginBottom:8}}>Affordability</div>
+            <div style={{fontSize:10,color:'var(--muted)',marginBottom:4}}>Mortgage repayments as % of disposable income (after dependants & bills)</div>
+            <div style={{height:6,background:'var(--border)',borderRadius:3,overflow:'hidden',marginBottom:6}}>
+              <div style={{height:'100%',width:`${Math.min(100,calc.repaymentRatio)}%`,background:affordColor,borderRadius:3}}/>
             </div>
-            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
-              <span className="mono" style={{fontSize:24,color:affordableColor}}>{pct(calc.repaymentRatio,1)}</span>
-              <span style={{fontSize:11,color:'var(--muted)',textAlign:'right',lineHeight:1.4,maxWidth:200}}>{affordableLabel}</span>
+            <div style={{display:'flex',justifyContent:'space-between',marginBottom:10}}>
+              <span className="mono" style={{fontSize:22,color:affordColor}}>{pct(calc.repaymentRatio,1)}</span>
+              <span style={{fontSize:11,color:'var(--muted)',textAlign:'right',lineHeight:1.4}}>{affordLabel}</span>
             </div>
-            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:4}}>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:4}}>
               {[
-                {l:'Combined income',v:fmt(calc.combinedIncome)},
-                {l:'Dependant costs',v:`-${fmt(calc.dependantAnnualCost)}`},
-                {l:'Other bills (annual)',v:`-${fmt(calc.otherBillsAnnual)}`},
+                {l:'Gross income',v:fmt(calc.combinedIncome)},
+                {l:'Dependants/yr',v:`-${fmt(calc.dependantAnnualCost)}`},
+                {l:'Other bills/yr',v:`-${fmt(calc.otherBillsAnnual)}`},
                 {l:'Disposable income',v:fmt(calc.disposableIncome)},
-                {l:'Annual repayments',v:`-${fmt(calc.annualRepay)}`},
-                {l:'Remaining after repayments',v:fmt(calc.disposableIncome-calc.annualRepay)},
+                {l:'Mortgage/yr',v:`-${fmt(calc.annualRepay)}`},
+                {l:'Left after mortgage',v:fmt(calc.disposableIncome-calc.annualRepay)},
               ].map(({l,v})=>(
-                <div key={l} style={{display:'flex',justifyContent:'space-between',fontSize:11,padding:'4px 0',borderBottom:'1px solid var(--border)'}}>
-                  <span style={{color:'var(--muted)'}}>{l}</span>
-                  <span className="mono">{v}</span>
+                <div key={l} style={{fontSize:11,padding:'4px 0',borderBottom:'1px solid var(--border)'}}>
+                  <div style={{color:'var(--muted)',fontSize:10}}>{l}</div>
+                  <div className="mono">{v}</div>
                 </div>
               ))}
             </div>
           </div>
 
+          {/* WEEKLY/MONTHLY/YEARLY BREAKDOWN */}
+          <div style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:8,padding:14}}>
+            <div style={{fontFamily:'var(--ff)',fontSize:14,fontWeight:500,marginBottom:12}}>Cost breakdown — weekly / monthly / yearly</div>
+            <table style={{width:'100%',borderCollapse:'collapse'}}>
+              {thead}
+              <tbody>
+                <tr><td colSpan={4} style={{padding:'8px 4px 4px',fontSize:10,letterSpacing:'.07em',textTransform:'uppercase',color:'var(--muted)'}}>Property costs</td></tr>
+                <TRow label="Mortgage repayment" wkly={fmt(repay.w)} mthly={fmt(repay.m)} yrly={fmt(repay.y)} indent/>
+                <TRow label="Council rates" wkly={fmt(council.w)} mthly={fmt(council.m)} yrly={fmt(council.y)} sub indent/>
+                <TRow label="Water rates" wkly={fmt(water.w)} mthly={fmt(water.m)} yrly={fmt(water.y)} sub indent/>
+                {Number(inputs.strataFees)>0&&<TRow label="Strata / body corp" wkly={fmt(strata.w)} mthly={fmt(strata.m)} yrly={fmt(strata.y)} sub indent/>}
+                <TRow label="Insurance" wkly={fmt(insure.w)} mthly={fmt(insure.m)} yrly={fmt(insure.y)} sub indent/>
+                <TRow label={`Maintenance (${inputs.maintenancePct}%)`} wkly={fmt(maint.w)} mthly={fmt(maint.m)} yrly={fmt(maint.y)} sub indent/>
+                {Number(inputs.landTax)>0&&<TRow label="Land tax" wkly={fmt(landtax.w)} mthly={fmt(landtax.m)} yrly={fmt(landtax.y)} sub indent/>}
+                {!isPPOR&&<TRow label={`PM fees (${inputs.pmFeesPct}%)`} wkly={fmt(pm.w)} mthly={fmt(pm.m)} yrly={fmt(pm.y)} sub indent/>}
+                {!isPPOR&&Number(inputs.vacancyWeeks)>0&&<TRow label={`Vacancy (${inputs.vacancyWeeks} wks allowance)`} wkly={fmt(vacancy.w)} mthly={fmt(vacancy.m)} yrly={fmt(vacancy.y)} sub indent/>}
+                <TRow label="Total property costs" wkly={fmt(propCost.w)} mthly={fmt(propCost.m)} yrly={fmt(propCost.y)} bold color="var(--neg)"/>
+
+                {!isPPOR&&<>
+                  <tr><td colSpan={4} style={{padding:'8px 4px 4px',fontSize:10,letterSpacing:'.07em',textTransform:'uppercase',color:'var(--muted)'}}>Income (investment)</td></tr>
+                  <TRow label="Rental income received" wkly={fmt(rent.w)} mthly={fmt(rent.m)} yrly={fmt(rent.y)} color="var(--pos)" indent/>
+                  {calc.taxBenefit>0&&<TRow label={`Neg. gearing tax benefit (${pct(calc.marginalRate*100,0)} rate)`} wkly={fmt(taxBen.w)} mthly={fmt(taxBen.m)} yrly={fmt(taxBen.y)} color="var(--pos)" indent sub/>}
+                  {calc.offset>0&&<TRow label="Offset interest saving" wkly={fmt(offsetSave.w)} mthly={fmt(offsetSave.m)} yrly={fmt(offsetSave.y)} color="var(--pos)" indent sub/>}
+                  <TRow label="Total property income" wkly={fmt(income.w)} mthly={fmt(income.m)} yrly={fmt(income.y)} bold color="var(--pos)"/>
+                </>}
+
+                <tr><td colSpan={4} style={{padding:'8px 4px 4px',fontSize:10,letterSpacing:'.07em',textTransform:'uppercase',color:'var(--muted)'}}>Personal expenses</td></tr>
+                {calc.dependantAnnualCost>0&&<TRow label={`Dependants (${inputs.dependants} × ${fmt(inputs.dependantCostPerWeek*52)}/yr est.)`} wkly={fmt(depend.w)} mthly={fmt(depend.m)} yrly={fmt(depend.y)} color="var(--neg)" indent sub/>}
+                {calc.otherBillsAnnual>0&&<TRow label="Other bills" wkly={fmt(bills.w)} mthly={fmt(bills.m)} yrly={fmt(bills.y)} color="var(--neg)" indent sub/>}
+
+                <TRow
+                  label={isPPOR?'Total weekly cost':'Net weekly position'}
+                  wkly={`${net.w>0&&!isPPOR?'+':''}${fmt(isPPOR?totalOut.w:(net.w+depend.w+bills.w))}`}
+                  mthly={`${net.m>0&&!isPPOR?'+':''}${fmt(isPPOR?totalOut.m:(net.m+depend.m+bills.m))}`}
+                  yrly={`${net.y>0&&!isPPOR?'+':''}${fmt(isPPOR?totalOut.y:(net.y+depend.y+bills.y))}`}
+                  bold
+                  color={isPPOR?'var(--neg)':totalOut.w<=0?'var(--pos)':'var(--neg)'}
+                />
+              </tbody>
+            </table>
+            {!isPPOR&&calc.cashflowAfterTaxWeekly>=0&&(
+              <div style={{marginTop:8,padding:'7px 10px',background:'rgba(126,168,106,.1)',border:'1px solid rgba(126,168,106,.2)',borderRadius:4,fontSize:11,color:'var(--pos)'}}>
+                ✦ Positively geared — this property pays you {fmt(Math.abs(calc.cashflowAfterTaxWeekly))}/week after all costs.
+              </div>
+            )}
+          </div>
+
+          {/* UPFRONT + 5YR SIDE BY SIDE */}
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
-            {/* UPFRONT BREAKDOWN */}
             <div style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:8,padding:14}}>
-              <div style={{fontFamily:'var(--ff)',fontSize:14,fontWeight:500,marginBottom:12}}>Upfront costs</div>
-              <Bar label="Deposit" value={Number(inputs.deposit)} total={calc.totalCashRequired} color="var(--acc)"/>
-              <Bar label="Stamp duty" value={calc.stampDuty} total={calc.totalCashRequired} color="#c07a3a" note={calc.stampDutySaving>0?`saved ${fmt(calc.stampDutySaving)}`:undefined}/>
-              {calc.lmi>0&&<Bar label="LMI" value={calc.lmi} total={calc.totalCashRequired} color="var(--neg)"/>}
-              <Bar label="Legal & inspection" value={Number(inputs.legalFees)+Number(inputs.buildingInspection)} total={calc.totalCashRequired} color="#7a8a6a"/>
-              <Bar label="Transfer & rego" value={calc.tf+calc.mr} total={calc.totalCashRequired} color="var(--muted)"/>
-              {calc.fhogGrant>0&&<div style={{marginTop:6,fontSize:10,color:'var(--pos)'}}>🎉 FHOG reduces cash by {fmt(calc.fhogGrant)}</div>}
-              {calc.lmiSaving>0&&<div style={{fontSize:10,color:'var(--pos)',marginTop:2}}>{calc.fhbsActive?'FHBS':'Guarantor'} saves {fmt(calc.lmiSaving)} in LMI</div>}
-              <div style={{borderTop:'1px solid var(--border)',marginTop:10,paddingTop:8,display:'flex',justifyContent:'space-between',fontWeight:600,fontSize:13}}>
-                <span>Total to close</span>
+              <div style={{fontFamily:'var(--ff)',fontSize:14,fontWeight:500,marginBottom:12}}>Cash needed to buy</div>
+              {[
+                {l:inputs.useGuarantor?'Deposit (held by you — not needed for loan)':'Deposit',v:fmt(Number(inputs.deposit)),dim:inputs.useGuarantor},
+                {l:`Stamp duty (${inputs.state})`,v:fmt(calc.stampDuty),note:calc.stampDutySaving>0?`saved ${fmt(calc.stampDutySaving)}`:null},
+                {l:'LMI',v:fmt(calc.lmi),dim:calc.lmi===0,note:calc.lmi===0?(inputs.useGuarantor?'waived – guarantor':calc.fhbsActive?'waived – FHBS':'LVR ≤ 80%'):null},
+                {l:'Legal / conveyancing',v:fmt(inputs.legalFees)},
+                {l:'Building & pest inspection',v:fmt(inputs.buildingInspection)},
+                {l:'Transfer & rego fees',v:fmt(calc.tf+calc.mr)},
+                {l:'FHOG grant',v:calc.fhogGrant>0?`-${fmt(calc.fhogGrant)}`:'—',pos:calc.fhogGrant>0},
+              ].map(({l,v,dim,note,pos})=>(
+                <div key={l} style={{display:'flex',justifyContent:'space-between',fontSize:11,padding:'5px 0',borderBottom:'1px solid var(--border)',opacity:dim?0.5:1}}>
+                  <span style={{color:'var(--muted)'}}>{l}{note&&<span style={{color:pos?'var(--pos)':'var(--acc)',marginLeft:4}}>{note}</span>}</span>
+                  <span className="mono" style={{color:pos?'var(--pos)':'var(--text)'}}>{v}</span>
+                </div>
+              ))}
+              <div style={{display:'flex',justifyContent:'space-between',fontWeight:600,fontSize:13,marginTop:8,paddingTop:6}}>
+                <span>Total cash required</span>
                 <span className="mono" style={{color:'var(--acc)'}}>{fmt(calc.totalCashRequired)}</span>
               </div>
             </div>
 
-            {/* MONTHLY FLOW */}
             <div style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:8,padding:14}}>
-              <div style={{fontFamily:'var(--ff)',fontSize:14,fontWeight:500,marginBottom:12}}>Monthly flow</div>
+              <div style={{fontFamily:'var(--ff)',fontSize:14,fontWeight:500,marginBottom:12}}>5-year total picture</div>
               {[
-                {l:'Rental income',v:fmt(calc.effectiveRent/12),pos:true},
-                {l:'Tax benefit',v:fmt(Math.max(0,calc.taxBenefit/12)),pos:true},
-                {l:'Mortgage repayment',v:`-${fmt(calc.monthlyRepay)}`,pos:false},
-                {l:'Property costs',v:`-${fmt(calc.totalOpEx/12)}`,pos:false},
-                {l:'Dependants',v:`-${fmt(calc.dependantAnnualCost/12)}`,pos:false,dim:inputs.dependants===0},
-                {l:'Other bills',v:`-${fmt(calc.otherBillsAnnual/12)}`,pos:false,dim:inputs.otherBillsMonthly===0},
-              ].filter(r=>!r.dim||r.dim===false).map(({l,v,pos,dim})=>(
-                <div key={l} style={{display:'flex',justifyContent:'space-between',fontSize:11,padding:'4px 0',borderBottom:'1px solid var(--border)',opacity:dim?0.4:1}}>
-                  <span style={{color:'var(--muted)'}}>{l}</span>
-                  <span className="mono" style={{color:pos?'var(--pos)':'var(--text)'}}>{v}</span>
+                {l:'Cash to buy (upfront)',v:fmt(calc.totalCashRequired),neg:true},
+                {l:'Mortgage repayments',v:fmt(calc.annualRepay*5),neg:true},
+                {l:'Property running costs',v:fmt(calc.totalOpEx*5),neg:true},
+                {l:'Dependants (5yr)',v:calc.dependantAnnualCost>0?fmt(calc.dependantAnnualCost*5):'—',neg:true},
+                {l:'Other bills (5yr)',v:calc.otherBillsAnnual>0?fmt(calc.otherBillsAnnual*5):'—',neg:true},
+                ...(isPPOR?[]:[
+                  {l:'Rent received (5yr)',v:`-${fmt(calc.effectiveRent*5)}`,neg:false},
+                  {l:'Tax benefits (5yr)',v:calc.taxBenefit>0?`-${fmt(calc.taxBenefit*5)}`:'—',neg:false},
+                ]),
+                {l:'Property value at yr 5 (est.)',v:fmt(calc.projection[4].propValue),acc:true},
+                {l:'Your equity at yr 5 (est.)',v:fmt(calc.projection[4].equity),acc:true},
+              ].map(({l,v,neg,acc})=>(
+                <div key={l} style={{display:'flex',justifyContent:'space-between',fontSize:11,padding:'5px 0',borderBottom:'1px solid var(--border)'}}>
+                  <span style={{color:acc?'var(--acc)':'var(--muted)'}}>{l}</span>
+                  <span className="mono" style={{color:acc?'var(--acc)':neg?'var(--text)':'var(--pos)'}}>{v}</span>
                 </div>
               ))}
-              <div style={{display:'flex',justifyContent:'space-between',fontSize:13,fontWeight:600,marginTop:8,paddingTop:6}}>
-                <span>Net monthly</span>
-                <span className="mono" style={{color:calc.cashflowAfterTaxWeekly>=0?'var(--pos)':'var(--neg)'}}>
-                  {calc.cashflowAfterTaxWeekly>=0?'+':''}{fmt(calc.cashflowAfterTax/12)}
-                </span>
+              <div style={{display:'flex',justifyContent:'space-between',fontWeight:600,fontSize:13,marginTop:8,paddingTop:6,borderTop:'1px solid var(--border)'}}>
+                <span>Net out of pocket (5yr)</span>
+                <span className="mono" style={{color:'var(--acc)'}}>{fmt(Math.max(0,net5yr))}</span>
               </div>
             </div>
           </div>
 
-          {/* PAYMENT TIMELINE */}
-          <div style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:8,padding:14}}>
-            <div style={{fontFamily:'var(--ff)',fontSize:14,fontWeight:500,marginBottom:12}}>When do you pay what?</div>
-            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'0 20px'}}>
-              {milestones.filter(m=>m.v>0).map((m,i)=>(
-                <div key={i} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'5px 0',borderBottom:'1px solid var(--border)',fontSize:11,gap:8}}>
-                  <span style={{flex:1}}>{m.l}</span>
-                  <span style={{fontSize:9,color:'var(--muted)',whiteSpace:'nowrap'}}>{m.when}</span>
-                  <span className="mono" style={{minWidth:70,textAlign:'right'}}>{fmt(m.v)}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* 5-YEAR PICTURE */}
-          <div style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:8,padding:14}}>
-            <div style={{fontFamily:'var(--ff)',fontSize:14,fontWeight:500,marginBottom:12}}>5-year total picture</div>
-            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'0 20px'}}>
-              {[
-                {l:'Cash paid upfront',v:fmt(calc.totalCashRequired),pos:false},
-                {l:'Mortgage repayments',v:fmt(calc.annualRepay*5),pos:false},
-                {l:'Property operating costs',v:fmt(calc.totalOpEx*5),pos:false},
-                {l:'Dependant costs (5yr)',v:fmt(calc.dependantAnnualCost*5),pos:false},
-                {l:'Other bills (5yr)',v:fmt(calc.otherBillsAnnual*5),pos:false},
-                {l:'Rent received',v:`-${fmt(calc.effectiveRent*5)}`,pos:true},
-                {l:'Tax benefits',v:`-${fmt(Math.max(0,calc.taxBenefit)*5)}`,pos:true},
-                {l:'Offset interest saved',v:calc.offset>0?`-${fmt(calc.interestSavingFromOffset*5)}`:'—',pos:true},
-                {l:'Property value (est.)',v:fmt(calc.projection[4].propValue),pos:true,acc:true},
-                {l:'Your equity (est.)',v:fmt(calc.projection[4].equity),pos:true,acc:true},
-              ].map(({l,v,pos,acc})=>(
-                <div key={l} style={{display:'flex',justifyContent:'space-between',fontSize:11,padding:'5px 0',borderBottom:'1px solid var(--border)'}}>
-                  <span style={{color:acc?'var(--acc)':'var(--muted)'}}>{l}</span>
-                  <span className="mono" style={{color:pos?'var(--pos)':acc?'var(--acc)':'var(--text)'}}>{v}</span>
-                </div>
-              ))}
-            </div>
-            <div style={{display:'flex',justifyContent:'space-between',fontSize:13,fontWeight:600,marginTop:10,paddingTop:8,borderTop:'1px solid var(--border)'}}>
-              <span>Net out of pocket (5yr)</span>
-              <span className="mono" style={{color:'var(--acc)'}}>{fmt(Math.max(0,netCost5yr))}</span>
-            </div>
-          </div>
-
-          <div style={{padding:'10px 14px',borderRadius:6,background:'var(--surface)',border:'1px solid var(--border)',fontSize:11,color:'var(--muted)',lineHeight:1.6}}>
-            💡 Adjust inputs in the <strong style={{color:'var(--text)'}}>Calculator</strong> tab — this page updates automatically. FHBS income caps: {inputs.incomeType==='combined'?'$200k combined':'$125k single'} · {inputs.state} price cap: {fmt(fhbsCaps[inputs.state]||750000)}.
+          <div style={{padding:'10px 14px',borderRadius:6,background:'var(--surface)',border:'1px solid var(--border)',fontSize:11,color:'var(--muted)',lineHeight:1.7}}>
+            {isPPOR
+              ?'💡 This property is set to owner-occupied (PPOR). Rental income and negative gearing have been removed — you\'re the one living there and paying all costs. Switch to "First Home Buyer → Rent out" or "Investor" in the Calculator tab to model it as an investment.'
+              :'💡 This property is set as an investment. Your tenant\'s rent partially offsets your mortgage cost — that\'s why rental income appears. The remainder is what comes out of your pocket each week. Negative gearing applies when rental income is less than total property expenses.'
+            }
+            {' '}FHBS income caps: {inputs.incomeType==='combined'?'$200k combined':'$125k single'} · {inputs.state} price cap: {fmt(fhbsCap)}.
           </div>
         </div>
       </div>
